@@ -2,6 +2,7 @@
 const http = require('request-promise-native')//require('http')
 const mc = require('minecraft-protocol')
 
+require('./lib/timestamp')()
 const config = require('./config')
 const serverhost = config.host
 const serverport = config.port || 25565
@@ -34,10 +35,10 @@ async function sendRequest(payload) {
     })
     //console.log(JSON.stringify(response,null,10))
     if (response.statusCode != 204) {
-      console.warn('Response:\n' + response.body + ', code = ' + response.statusCode)
+      console.log('Response:\n' + response.body + ', code = ' + response.statusCode)
     }
   } catch (err) {
-    console.warn('Ошибка при отправке\n' + err)
+    console.log('Ошибка при отправке\n' + err)
   }
 }
 
@@ -58,7 +59,7 @@ async function getDynmapInfo() {
     let json = JSON.parse(data)
     return json
   } catch (err) {
-    console.warn(err)
+    console.log(err)
     return {}
   }
   /*
@@ -100,7 +101,7 @@ async function getPlayerList() {
     players.sort()
     return players
   } catch (err) {
-    console.warn('Error\n' + serverInfo + '\n' + err)
+    console.log('Error\n' + serverInfo + '\n' + err)
   }
 }
 
@@ -110,7 +111,7 @@ async function getUUID(name) {
     let json = JSON.parse(data)
     return json.id
   } catch (err) {
-    console.warn('Player not found: ' + name + '\n' + err)
+    console.log('Player not found: ' + name + '\n' + err)
     return '00000000-0000-0000-0000-000000000000'
   }
 }
@@ -191,7 +192,7 @@ async function CheckServer() {
     })//*/
     return true
   } catch (err) {
-    console.warn('Ошибка обработки сервера\n'+serverInfo+'\n'+err)
+    console.log('Ошибка обработки сервера\n'+serverInfo+'\n'+err)
   }
 }
 
@@ -202,7 +203,7 @@ async function CheckDynmap() {
     for (const event of dynmapInfo.updates) {
       if (event.timestamp > timestamp && event.type != 'tile') {
         if (event.type == 'chat') {
-          console.log(event.timestamp)
+          //console.log(event.timestamp)
           let time = new Date(event.timestamp).toISOString()
           if (event.source == 'player') {
             let player = event.account.replace(/[&]./g, '')
@@ -244,7 +245,7 @@ async function CheckDynmap() {
     timestamp = dynmapInfo.timestamp
     return true
   } catch (err) {
-    console.warn('Ошибка обработки событий\n'+dynmapInfo+'\n'+err)
+    console.log('Ошибка обработки событий\n'+dynmapInfo+'\n'+err)
     return false
   }
 }
@@ -265,8 +266,8 @@ async function Init() {
       "message": 'Version: ' + version,
       "timestamp": new Date().toISOString()
     })//*/
-    console.log('Ready ' + new Date().toISOString())
-    console.log('Connected to ' + serverInfo.description.text + '\non ' + serverhost + ":" + serverport)
+    console.info('Ready ' + new Date().toISOString())
+    console.info('Connected to ' + serverInfo.description.text + '\non ' + serverhost + ":" + serverport)
   } catch (err) {
     throw "Can`t connect to " + serverhost + ":" + serverport + "\n" + err
   }
@@ -277,15 +278,18 @@ async function Loop() {
     let stServer = await CheckServer()
     if (stServer){
       let stDynmap = await CheckDynmap()
-      console.log(stServer+' '+stDynmap)
+      //console.log(stServer+' '+stDynmap)
+      if (!stDynmap){
+        //console.log('')
+      }
       setTimeout(Loop,wait)
     }else{
       setTimeout(Loop,wait*2)
-      console.log('slow mod')
+      console.log('No connection to server. Slow mod.')
     }
 
   } catch (err) {
-    console.warn('Ошибка в цикле\n' + err)
+    console.log('Ошибка в цикле\n' + err)
   }
 }
 //Main
