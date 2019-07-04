@@ -1,0 +1,14 @@
+[Unit]
+Description=DynmapToDiscordJS
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=Virenbar
+ExecStart=/DynmapToDiscordJS/run.sh
+
+[Install]
+WantedBy=multi-user.target
