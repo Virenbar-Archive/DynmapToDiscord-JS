@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-const http = require('request-promise-native')//require('http')
+const http = require('request-promise-native')
 const mc = require('minecraft-protocol')
 
 require('./lib/timestamp')()
@@ -9,19 +9,22 @@ const serverport = config.port || 25565
 const dynmapfile = config.dynmap
 
 const name = 'Dynmap to Discord'
-const version = '3.0'
-const wait = 10 * 1000
+const version = '3.1'
+const serverWait = 60 * 1000
+const dynmapWait = 10 * 1000
+const listWait = 5 * 1000
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 var serverInfo
 var dynmapInfo
-var timestamp = 0//420000
+var timestamp = 0 //420000
 var playersPrev = []
 var playersHash = ''
 
 async function sendRequest(payload) {
   try {
-    //console.log(payload.embeds[0])/*
+    //console.log(payload.embeds[0])
     let path = config.webhook
-    //payload = {"content":"gg"}
     let response = await http({
       'uri': path,
       'method': 'POST',
@@ -37,14 +40,23 @@ async function sendRequest(payload) {
     if (response.statusCode != 204) {
       console.log('Response:\n' + response.body + ', code = ' + response.statusCode)
     }
+    /* console.log('Left '+response.headers['x-ratelimit-remaining']+
+      '/'+response.headers['x-ratelimit-limit']+
+      '. Reset in '+new Date(response.headers['x-ratelimit-reset']*1000)+
+      ' '+(response.headers['x-ratelimit-reset']-Math.floor(Date.now()/1000))
+    ) */
   } catch (err) {
-    console.log('Ошибка при отправке\n' + err)
+    console.log('Error sending post request')
+    console.info(err)
   }
 }
 
 function getServerInfo() {
   return new Promise((resolve, reject) => {
-    mc.ping({ host: serverhost, port: serverport }, (err, result) => {
+    mc.ping({
+      host: serverhost,
+      port: serverport
+    }, (err, result) => {
       if (err) {
         reject(err)
       }
@@ -62,26 +74,6 @@ async function getDynmapInfo() {
     console.log(err)
     return {}
   }
-  /*
-  return new Promise((resolve, reject) => {
-		http.get(dynmapfile, (res) => {
-			let data = ''
-			res.on('data', (chunk) => {
-				data += chunk
-			})
-			res.on('end', () => {
-				try {
-					//let json = JSON.parse(data)
-					resolve(JSON.parse(data))
-				} catch (err) {
-					reject(err)
-				}
-			})
-		})
-			.on('error', (err) => {
-				reject(err)
-			})
-	})//*/
 }
 
 async function getPlayerList() {
@@ -95,13 +87,16 @@ async function getPlayerList() {
       serverInfo.players.sample.forEach(player => {
         if (!players.includes(player.name)) {
           players.push(player.name)
+          //console.log(player.name)
         }
       })
+      await sleep(listWait)
     }
     players.sort()
     return players
   } catch (err) {
-    console.log('Error\n' + serverInfo + '\n' + err)
+    console.log('Error getting player list')
+    console.info(err)
   }
 }
 
@@ -111,17 +106,20 @@ async function getUUID(name) {
     let json = JSON.parse(data)
     return json.id
   } catch (err) {
-    console.log('Player not found: ' + name + '\n' + err)
+    console.log('Player not found: ' + name)
+    console.info(err)
     return '00000000-0000-0000-0000-000000000000'
   }
 }
 
-function sendMessage(msg) {
-  const message = {
-    //content : ""
-    //username : ""
-    //avatar_url : ""
-    "embeds": [{
+function sendMessage(msgs) {
+  if (!Array.isArray(msgs)) {
+    msgs = [msgs]
+  }
+  //console.log(msgs.length)
+  let embeds = new Array()
+  for (const msg of msgs) {
+    embeds.push({
       "author": {
         "name": msg.name,
         "url": '',
@@ -135,7 +133,13 @@ function sendMessage(msg) {
         "text": msg.footer
       },
       "timestamp": msg.timestamp || ''
-    }]
+    })
+  }
+  const message = {
+    //content : ""
+    //username : ""
+    //avatar_url : ""
+    "embeds": embeds
   }
   //let payload = JSON.stringify(message)
   return sendRequest(message)
@@ -149,7 +153,9 @@ function nodash(str) {
 async function CheckServer() {
   try {
     serverInfo = await getServerInfo()
-    if (!serverInfo) { return false }
+    if (!serverInfo) {
+      return false
+    }
     let players = []
     if (serverInfo.players.sample) {
       players = await getPlayerList()
@@ -161,7 +167,6 @@ async function CheckServer() {
     }
     playersHash = playersHashNew
 
-    //console.log(serverInfo.description, serverInfo.players, players)
     let playersOnline = []
     let playersList = []
     players.forEach(player => {
@@ -169,37 +174,38 @@ async function CheckServer() {
         playersOnline.push(player)
         playersPrev.splice(playersPrev.indexOf(player), 1)
         playersList.push(nodash(player))
-        //table.insert(playersList, nodash(player))
       } else {
         playersOnline.push(player)
         playersList.unshift('__' + nodash(player) + '__')
-        //table.insert(playersList, 1, '__'+nodash(player)+'__')
       }
     })
     playersPrev.forEach(player => {
       playersList.push('~~' + nodash(player) + '~~')
-      //table.insert(playersList, '~~'..nodash(player)..'~~')
     })
     playersPrev = playersOnline
 
-    //console.log(playersList.join(' '))/*
     sendMessage({
       //title = 'Список игроков',
       'message': playersList.join(' '),
       //'color': 0xffffff,
-      'footer': 'Список игроков',
+      'footer': 'Список игроков (' + playersOnline.length + ')',
       'timestamp': new Date().toISOString()
-    })//*/
+    }) //*/
     return true
   } catch (err) {
-    console.log('Ошибка обработки сервера\n'+serverInfo+'\n'+err)
+    console.log('Ошибка обработки сервера')
+    console.info(serverInfo)
+    console.info(err)
   }
 }
 
 async function CheckDynmap() {
   try {
     dynmapInfo = await getDynmapInfo()
-    if (!dynmapInfo) { return false }
+    if (!dynmapInfo) {
+      return false
+    }
+    let myEmbeds = new Array()
     for (const event of dynmapInfo.updates) {
       if (event.timestamp > timestamp && event.type != 'tile') {
         if (event.type == 'chat') {
@@ -207,8 +213,8 @@ async function CheckDynmap() {
           let time = new Date(event.timestamp).toISOString()
           if (event.source == 'player') {
             let player = event.account.replace(/[&]./g, '')
-            let uuid = await getUUID(player.replace(/\[.*?\]/, ''))
-            await sendMessage({
+            let uuid = await getUUID(player.replace(/\[.*?\]/g, ''))
+            myEmbeds.push({
               //"name" = player,
               //"icon" = 'https://crafatar.com/avatars/'..getUUID(player:gsub('%[.-%]',''))..'?overlay',   --Steve 00000000-0000-0000-0000-000000000000 Alex ..0001
               "message": event.message,
@@ -219,7 +225,7 @@ async function CheckDynmap() {
             })
           } else if (event.source == 'plugin') {
             if (event.message.startsWith('[Server]')) {
-              await sendMessage({
+              myEmbeds.push({
                 //"name" : 'Server',
                 //"icon" : serverInfo.favicon,
                 "message": event.message.substr(8),
@@ -228,10 +234,19 @@ async function CheckDynmap() {
                 "footer": 'Server',
                 "timestamp": time
               })
+            } else if (!event.message.match(/вошел|вышел/i)) {
+              myEmbeds.push({
+                //"name" : 'Server',
+                //"icon" : serverInfo.favicon,
+                "message": event.message,
+                "color": 0xFFFF55,
+                //"footer_icon": '',
+                "footer": 'Unknown',
+                "timestamp": time
+              })
             }
-          }
-          else if (event.source == 'web') {
-            await sendMessage({
+          } else if (event.source == 'web') {
+            myEmbeds.push({
               //"name" : '[Web]'..event.playerName,
               "message": event.message,
               "color": 0xffffff,
@@ -241,11 +256,18 @@ async function CheckDynmap() {
           }
         }
       }
+      if (myEmbeds.length == 10) {
+        await sendMessage(myEmbeds)
+        myEmbeds.length = 0
+      }
+    }
+    if (myEmbeds.length > 0) {
+      await sendMessage(myEmbeds)
     }
     timestamp = dynmapInfo.timestamp
     return true
   } catch (err) {
-    console.log('Ошибка обработки событий\n'+dynmapInfo+'\n'+err)
+    console.log('Ошибка обработки событий\n' + dynmapInfo + '\n' + err)
     return false
   }
 }
@@ -265,7 +287,7 @@ async function Init() {
       "title": name,
       "message": 'Version: ' + version,
       "timestamp": new Date().toISOString()
-    })//*/
+    }) //*/
     console.info('Ready ' + new Date().toISOString())
     console.info('Connected to ' + serverInfo.description.text + '\non ' + serverhost + ":" + serverport)
   } catch (err) {
@@ -273,21 +295,30 @@ async function Init() {
   }
 }
 
-async function Loop() {
+async function LoopServer() {
   try {
     let stServer = await CheckServer()
-    if (stServer){
-      let stDynmap = await CheckDynmap()
-      //console.log(stServer+' '+stDynmap)
-      if (!stDynmap){
-        //console.log('')
-      }
-      setTimeout(Loop,wait)
-    }else{
-      setTimeout(Loop,wait*2)
+    if (stServer) {
+      let ps = 4 * (serverInfo.players.online / serverInfo.players.max)
+      setTimeout(LoopServer, serverWait+ps)
+    } else {
+      setTimeout(LoopServer, serverWait * 2)
       console.log('No connection to server. Slow mod.')
     }
+  } catch (err) {
+    console.log('Ошибка в цикле\n' + err)
+  }
+}
 
+async function LoopDynmap() {
+  try {
+    let stDynmap = await CheckDynmap()
+    if (stDynmap) {
+      setTimeout(LoopDynmap, dynmapWait)
+    } else {
+      setTimeout(LoopDynmap, dynmapWait * 2)
+      console.log('No connection to dynmap. Slow mod.')
+    }
   } catch (err) {
     console.log('Ошибка в цикле\n' + err)
   }
@@ -296,16 +327,14 @@ async function Loop() {
 (async () => {
   try {
     await Init()
-    Loop()
+    LoopServer()
+    LoopDynmap()
     //CheckServer()
     //CheckDynmap()
   } catch (err) {
     throw err
   }
 })()
-
-/*
-https://learn.javascript.ru/settimeout-setinterval
-https://stackoverflow.com/questions/1280263/changing-the-interval-of-setinterval-while-its-running
-https://stackoverflow.com/questions/46515764/how-can-i-use-async-await-at-the-top-level
-*/
+/**Notes
+ * Loops separated because getPlayerList is too slow when players>20
+ */
