@@ -234,6 +234,13 @@ async function CheckDynmap() {
                 "footer": 'Server',
                 "timestamp": time
               })
+            }else if(event.message.startsWith('* ')){
+              myEmbeds.push({
+                "message":event.message,
+                "color": 0xFFFF55,
+                "footer": '/me',
+                "timestamp": time
+              })
             } else if (!event.message.match(/вошел|вышел/i)) {
               myEmbeds.push({
                 //"name" : 'Server',
