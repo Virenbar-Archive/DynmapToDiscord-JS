@@ -147,7 +147,7 @@ function sendMessage(msgs) {
 
 function nodash(str) {
   //Underscore escape
-  return str.replace(/^_/, '\\_').replace(/_$/, '\\_')
+  return str.replace(/_/g, '\\_')
 }
 
 async function CheckServer() {
@@ -313,7 +313,7 @@ async function LoopServer() {
       console.log('No connection to server. Slow mod.')
     }
   } catch (err) {
-    console.log('Ошибка в цикле\n' + err)
+    console.log('Error in  server loop\n' + err)
   }
 }
 
@@ -327,21 +327,19 @@ async function LoopDynmap() {
       console.log('No connection to dynmap. Slow mod.')
     }
   } catch (err) {
-    console.log('Ошибка в цикле\n' + err)
+    console.log('Error in dynmap loop\n' + err)
   }
 }
 //Main
 (async () => {
-  try {
     await Init()
     LoopServer()
     LoopDynmap()
     //CheckServer()
     //CheckDynmap()
-  } catch (err) {
-    throw err
-  }
-})()
+})().catch((err)=>{
+  throw err
+})
 /**Notes
  * Loops separated because getPlayerList is too slow when players>20
  */
